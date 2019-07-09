@@ -14,6 +14,7 @@ class Rake::Task
     Bugsnag.configuration.app_type ||= "rake"
     old_task = Bugsnag.configuration.request_data[:bugsnag_running_task]
     Bugsnag.configuration.set_request_data :bugsnag_running_task, self
+    Bugsnag.configuration.runtime_versions[:rake] = ::Rake::VERSION
 
     execute_without_bugsnag(args)
 
