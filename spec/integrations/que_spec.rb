@@ -7,6 +7,9 @@ describe 'Bugsnag::Que', :order => :defined do
       @mocked_que = true
       class ::Que
         Version = '9.9.9'
+        class << self
+          attr_accessor :error_notifier
+        end
       end
       module Kernel
         alias_method :old_require, :require
@@ -32,7 +35,6 @@ describe 'Bugsnag::Que', :order => :defined do
     expect(report).to receive(:add_tab).with(:job, {
       :error_count => 1,
       :job_class => 'ActiveJob::QueueAdapters::QueAdapter::JobWrapper',
-      :args => [{"queue_name" => "foo", "arguments" => "bar"}],
       :job_id => "ID",
       :wrapper_job_class => 'ActiveJob::QueueAdapters::QueAdapter::JobWrapper',
       :wrapper_job_id => "ID",
@@ -63,6 +65,24 @@ describe 'Bugsnag::Que', :order => :defined do
     load './lib/bugsnag/integrations/que.rb'
     
     expect(runtime).to eq("que" => "9.9.9")
+  end
+
+  context 'when the job is nil' do
+    it 'notifies Bugsnag' do
+      load './lib/bugsnag/integrations/que.rb'
+      error = RuntimeError.new('nil job')
+      report = Bugsnag::Report.new(error, Bugsnag::Configuration.new)
+      expect(Bugsnag).to receive(:notify).with(error, true).and_yield(report)
+
+      Que.error_notifier.call(error, nil)
+
+      expect(report.meta_data['custom'].fetch('job')).to eq(nil)
+      expect(report.severity).to eq('error')
+      expect(report.severity_reason).to eq({
+        :type => Bugsnag::Report::UNHANDLED_EXCEPTION_MIDDLEWARE,
+        :attributes => {:framework => 'Que'},
+      })
+    end
   end
 
   after do
